@@ -152,6 +152,162 @@ class DuneAnalytics:
         else:
             logger.error(response.text)
             return None
+    
+    def query_sql_code(self, query_id):
+        """
+        Fetch the query result id for a query
+
+        :param query_id: provide the query_id
+        :return:
+        """
+        self.query_id = query_id
+        query_data = {"operationName": "FindQuery", 
+                      "variables": {"favs_last_24h":False,"favs_last_7d":False,"favs_last_30d":False,"favs_all_time":True,"session_filter":{"_eq":122164},"id":query_id},
+                      "query": """
+                        query FindQuery($session_filter: Int_comparison_exp!, $id: Int!, $favs_last_24h: Boolean! = false, $favs_last_7d: Boolean! = false, $favs_last_30d: Boolean! = false, $favs_all_time: Boolean! = true) {
+                        queries(where: {id: {_eq: $id}}) {
+                            ...Query
+                            favorite_queries(where: {user_id: $session_filter}, limit: 1) {
+                            created_at
+                            __typename
+                            }
+                            __typename
+                        }
+                        }
+
+                        fragment Query on queries {
+                        ...BaseQuery
+                        ...QueryVisualizations
+                        ...QueryForked
+                        ...QueryUsers
+                        ...QueryTeams
+                        ...QueryFavorites
+                        __typename
+                        }
+
+                        fragment BaseQuery on queries {
+                        id
+                        dataset_id
+                        name
+                        description
+                        query
+                        is_private
+                        is_temp
+                        is_archived
+                        created_at
+                        updated_at
+                        schedule
+                        tags
+                        parameters
+                        __typename
+                        }
+
+                        fragment QueryVisualizations on queries {
+                        visualizations {
+                            id
+                            type
+                            name
+                            options
+                            created_at
+                            __typename
+                        }
+                        __typename
+                        }
+
+                        fragment QueryForked on queries {
+                        forked_query {
+                            id
+                            name
+                            user {
+                            name
+                            __typename
+                            }
+                            team {
+                            handle
+                            __typename
+                            }
+                            __typename
+                        }
+                        __typename
+                        }
+
+                        fragment QueryUsers on queries {
+                        user {
+                            ...User
+                            __typename
+                        }
+                        team {
+                            id
+                            name
+                            handle
+                            profile_image_url
+                            __typename
+                        }
+                        __typename
+                        }
+
+                        fragment User on users {
+                        id
+                        name
+                        profile_image_url
+                        __typename
+                        }
+
+                        fragment QueryTeams on queries {
+                        team {
+                            ...Team
+                            __typename
+                        }
+                        __typename
+                        }
+
+                        fragment Team on teams {
+                        id
+                        name
+                        handle
+                        profile_image_url
+                        __typename
+                        }
+
+                        fragment QueryFavorites on queries {
+                        query_favorite_count_all @include(if: $favs_all_time) {
+                            favorite_count
+                            __typename
+                        }
+                        query_favorite_count_last_24h @include(if: $favs_last_24h) {
+                            favorite_count
+                            __typename
+                        }
+                        query_favorite_count_last_7d @include(if: $favs_last_7d) {
+                            favorite_count
+                            __typename
+                        }
+                        query_favorite_count_last_30d @include(if: $favs_last_30d) {
+                            favorite_count
+                            __typename
+                        }
+                        __typename
+                        }
+
+                      """
+                      }
+
+        self.session.headers.update({'authorization': f'Bearer {self.token}'})
+
+        response = self.session.post(GRAPH_URL, json=query_data)
+        if response.status_code == 200:
+            data = response.json()
+            logger.debug(data)
+            if 'errors' in data:
+                logger.error(data.get('errors'))
+                return None
+            # print(data)
+            # result_id = data.get('data').get('get_result_v3').get('result_id')
+            sql_codes = data.get('data').get('queries')[0]['query']
+            return sql_codes
+        else:
+            logger.error(response.text)
+            return None
 
     def query_result(self, result_id):
         """
